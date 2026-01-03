@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Card } from '../types';
+import { MECHANIC_DESCRIPTIONS } from '../constants';
 
 interface CardProps {
   card: Card;
@@ -10,6 +11,8 @@ interface CardProps {
 }
 
 export const CardComponent: React.FC<CardProps> = ({ card, onClick, playable, isSelected, isEnemy }) => {
+  const [showTooltip, setShowTooltip] = useState(false);
+
   if (isEnemy) {
     return (
       <div 
@@ -26,9 +29,16 @@ export const CardComponent: React.FC<CardProps> = ({ card, onClick, playable, is
   const isSpell = card.cardType === 'spell';
   const badgeClass = "font-extrabold text-[8px] px-[3px] py-[1px] rounded-[4px] border";
 
+  const mechanics = [
+    ...(card.taunt ? ['taunt'] : []),
+    ...(card.mechanics || [])
+  ];
+
   return (
     <div 
       onClick={playable ? onClick : undefined}
+      onMouseEnter={() => setShowTooltip(true)}
+      onMouseLeave={() => setShowTooltip(false)}
       className={`
         relative w-24 h-36 md:w-32 md:h-44 rounded-lg border-2 flex flex-col items-center p-1 shadow-lg transition-all duration-200 shrink-0
         ${playable ? 'cursor-pointer hover:-translate-y-6 hover:shadow-xl hover:z-20 z-10' : 'cursor-not-allowed opacity-80 grayscale-[0.3]'}
@@ -36,6 +46,18 @@ export const CardComponent: React.FC<CardProps> = ({ card, onClick, playable, is
         ${isSpell ? 'bg-[#f0e6d2] border-purple-900 rounded-t-3xl' : 'bg-[#e3dac9] border-stone-700'}
       `}
     >
+      {/* Tooltip */}
+      {showTooltip && mechanics.length > 0 && (
+        <div className="absolute -right-[150%] top-0 w-40 bg-stone-900/95 text-stone-100 text-[10px] p-2 rounded border border-stone-500 z-50 pointer-events-none shadow-xl backdrop-blur-sm text-left">
+           {mechanics.map(m => (
+             <div key={m} className="mb-2 last:mb-0">
+               <span className="font-bold text-yellow-500 uppercase block text-[9px] mb-0.5">{m.replace('_', ' ')}</span>
+               <span className="text-stone-300 leading-tight">{MECHANIC_DESCRIPTIONS[m] || 'Special effect.'}</span>
+             </div>
+           ))}
+        </div>
+      )}
+
       {/* Spell Indicator */}
       {isSpell && (
         <div className="absolute -top-1 left-1/2 transform -translate-x-1/2 text-[10px] font-bold text-purple-900 bg-purple-200 px-2 rounded-full border border-purple-900 z-30">

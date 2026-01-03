@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Minion } from '../types';
+import { MECHANIC_DESCRIPTIONS } from '../constants';
 
 interface MinionProps {
   minion: Minion;
@@ -21,6 +22,7 @@ export const MinionComponent: React.FC<MinionProps> = ({
   recentDamage
 }) => {
   const [showDamage, setShowDamage] = useState<number | null>(null);
+  const [showTooltip, setShowTooltip] = useState(false);
 
   useEffect(() => {
     if (recentDamage) {
@@ -30,9 +32,16 @@ export const MinionComponent: React.FC<MinionProps> = ({
     }
   }, [recentDamage]);
 
+  const mechanics = [
+    ...(minion.taunt ? ['taunt'] : []),
+    ...(minion.mechanics || [])
+  ];
+
   return (
     <div 
       onClick={onClick}
+      onMouseEnter={() => setShowTooltip(true)}
+      onMouseLeave={() => setShowTooltip(false)}
       className={`
         relative w-24 h-32 rounded-md flex flex-col items-center p-1 transition-all duration-200
         ${isSelected ? 'ring-4 ring-blue-500 -translate-y-2 scale-105 shadow-[0_0_15px_rgba(59,130,246,0.5)] z-20' : ''}
@@ -41,9 +50,22 @@ export const MinionComponent: React.FC<MinionProps> = ({
         ${minion.taunt ? 'taunt-border bg-stone-300 taunt-shield' : 'border-2 border-stone-600 bg-[#e3dac9]'}
         ${attackDirection === 'up' ? 'attack-up' : ''}
         ${attackDirection === 'down' ? 'attack-down' : ''}
+        ${minion.isDead ? 'death-anim' : ''}
         shadow-md
       `}
     >
+      {/* Tooltip */}
+      {showTooltip && mechanics.length > 0 && (
+        <div className="absolute -right-[150%] top-0 w-40 bg-stone-900/95 text-stone-100 text-[10px] p-2 rounded border border-stone-500 z-50 pointer-events-none shadow-xl backdrop-blur-sm text-left">
+           {mechanics.map(m => (
+             <div key={m} className="mb-2 last:mb-0">
+               <span className="font-bold text-yellow-500 uppercase block text-[9px] mb-0.5">{m.replace('_', ' ')}</span>
+               <span className="text-stone-300 leading-tight">{MECHANIC_DESCRIPTIONS[m] || 'Special effect.'}</span>
+             </div>
+           ))}
+        </div>
+      )}
+
       {/* Divine Shield Overlay */}
       {minion.hasShield && (
         <div className="absolute -inset-2 rounded-lg border-4 border-yellow-400 opacity-60 bg-yellow-100/20 pointer-events-none animate-pulse z-10 box-content shadow-[0_0_15px_rgba(250,204,21,0.5)]" />
@@ -57,7 +79,7 @@ export const MinionComponent: React.FC<MinionProps> = ({
       )}
 
       {/* Sleeping Zzz */}
-      {!minion.canAttack && !minion.justPlayed && !minion.mechanics?.includes('cant_attack') && (
+      {!minion.canAttack && !minion.justPlayed && !minion.mechanics?.includes('cant_attack') && !minion.isDead && (
          <div className="absolute -top-4 right-0 text-xl animate-bounce z-20">💤</div>
       )}
 

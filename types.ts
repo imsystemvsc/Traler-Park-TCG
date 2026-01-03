@@ -36,6 +36,7 @@ export interface Minion extends Card {
   attack: number; // Required for minions
   health: number; // Required for minions
   hasShield?: boolean; // Runtime state for Divine Shield
+  isDead?: boolean; // Runtime state for death animation
 }
 
 export interface Player {

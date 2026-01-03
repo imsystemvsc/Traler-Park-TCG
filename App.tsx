@@ -46,6 +46,13 @@ const initializeGame = (): GameState => {
   };
 };
 
+const markDead = (m: Minion): Minion => {
+  if (m.currentHealth <= 0 && !m.isDead) {
+    return { ...m, isDead: true };
+  }
+  return m;
+};
+
 const App: React.FC = () => {
   // --- State ---
   const [gameState, setGameState] = useState<GameState>(initializeGame);
@@ -88,6 +95,32 @@ const App: React.FC = () => {
     setDamageEvents({});
     playSound('click');
   };
+
+  // --- Effect to cleanup Dead Minions after animation ---
+  useEffect(() => {
+    const playerDead = gameState.player.board.some(m => m.isDead);
+    const enemyDead = gameState.enemy.board.some(m => m.isDead);
+
+    if (playerDead || enemyDead) {
+      const timer = setTimeout(() => {
+        setGameState(prev => {
+          // Log deaths
+          const newLogs = [...prev.logs];
+          prev.player.board.filter(m => m.isDead).forEach(m => newLogs.push(`${m.name} was destroyed.`));
+          prev.enemy.board.filter(m => m.isDead).forEach(m => newLogs.push(`${m.name} was destroyed.`));
+
+          return {
+            ...prev,
+            player: { ...prev.player, board: prev.player.board.filter(m => !m.isDead) },
+            enemy: { ...prev.enemy, board: prev.enemy.board.filter(m => !m.isDead) },
+            logs: newLogs
+          };
+        });
+      }, 600); // Matches CSS animation duration
+      return () => clearTimeout(timer);
+    }
+  }, [gameState.player.board, gameState.enemy.board]);
+
 
   const checkWinCondition = useCallback(() => {
     setGameState(prev => {
@@ -165,7 +198,7 @@ const App: React.FC = () => {
         if (card.mechanics?.includes('battlecry_damage')) {
             const damage = card.mechanicValue || 1;
             const targets = [
-                ...newEnemy.board.map(m => ({type: 'minion', id: m.id})),
+                ...newEnemy.board.filter(m => !m.isDead).map(m => ({type: 'minion', id: m.id})),
                 {type: 'hero', id: 'enemy-hero'}
             ];
             const target = targets[Math.floor(Math.random() * targets.length)];
@@ -196,7 +229,7 @@ const App: React.FC = () => {
         newPlayer.board = [...newPlayer.board, newMinion];
 
         // Clean dead minions from battlecry
-        newEnemy.board = newEnemy.board.filter(m => m.currentHealth > 0);
+        newEnemy.board = newEnemy.board.map(markDead);
 
         return {
             ...prev,
@@ -231,6 +264,7 @@ const App: React.FC = () => {
               const dmg = card.spellValue || 1;
               // Damage both boards - Divine Shield Logic
               newPlayer.board.forEach((m, i) => {
+                  if (m.isDead) return;
                   if (m.hasShield) {
                       newPlayer.board[i].hasShield = false;
                       triggerDamage(m.id, 0);
@@ -240,6 +274,7 @@ const App: React.FC = () => {
                   }
               });
               newEnemy.board.forEach((m, i) => {
+                  if (m.isDead) return;
                   if (m.hasShield) {
                       newEnemy.board[i].hasShield = false;
                       triggerDamage(m.id, 0);
@@ -251,8 +286,8 @@ const App: React.FC = () => {
               logs.push(`Gas leak! Everyone took ${dmg} damage.`);
               
               // Cleanup
-              newPlayer.board = newPlayer.board.filter(m => m.currentHealth > 0);
-              newEnemy.board = newEnemy.board.filter(m => m.currentHealth > 0);
+              newPlayer.board = newPlayer.board.map(markDead);
+              newEnemy.board = newEnemy.board.map(markDead);
           }
 
           newPlayer.mana -= card.cost;
@@ -320,7 +355,7 @@ const App: React.FC = () => {
               } else {
                    const isEnemy = targetType === 'enemy-minion';
                    const { minion, idx, board } = getTargetMinion(targetId, isEnemy);
-                   if (idx !== -1) {
+                   if (idx !== -1 && !minion.isDead) {
                        board[idx] = { ...minion, currentHealth: Math.min(minion.currentHealth + heal, minion.health) };
                        targetName = minion.name;
                        triggerHeal(minion.id, heal);
@@ -335,7 +370,7 @@ const App: React.FC = () => {
               }
               const isEnemy = targetType === 'enemy-minion';
               const { minion, idx, board } = getTargetMinion(targetId, isEnemy);
-              if (idx !== -1) {
+              if (idx !== -1 && !minion.isDead) {
                   board[idx] = { 
                       ...minion, 
                       attack: minion.attack + buff, 
@@ -361,15 +396,8 @@ const App: React.FC = () => {
               logs.push(`${card.name} repossessed ${targetName}.`);
           }
 
-          const cleanupBoard = (board: Minion[]) => board.filter(m => {
-              if (m.currentHealth <= 0) {
-                  logs.push(`${m.name} died.`);
-                  return false;
-              }
-              return true;
-          });
-          newPlayer.board = cleanupBoard(newPlayer.board);
-          newEnemy.board = cleanupBoard(newEnemy.board);
+          newPlayer.board = newPlayer.board.map(markDead);
+          newEnemy.board = newEnemy.board.map(markDead);
 
           newPlayer.mana -= card.cost;
           newPlayer.hand = newPlayer.hand.filter(c => c.id !== card.id);
@@ -382,6 +410,8 @@ const App: React.FC = () => {
   const handleMinionSelect = (minion: Minion) => {
     if (gameState.turn !== 'player' || attackingId) return;
     
+    if (minion.isDead) return;
+
     if (selectedCardId) {
         resolveTargetedSpell(minion.id, 'player-minion');
         return;
@@ -423,8 +453,9 @@ const App: React.FC = () => {
   const executeAttack = async (targetType: 'enemy-hero' | 'enemy-minion', targetId?: string) => {
     const attacker = gameState.player.board.find(m => m.id === selectedMinionId);
     if (!attacker) return;
+    if (attacker.isDead) return;
 
-    const enemyMinions = gameState.enemy.board;
+    const enemyMinions = gameState.enemy.board.filter(m => !m.isDead);
     const hasTaunt = enemyMinions.some(m => m.taunt);
     if (hasTaunt) {
         if (targetType === 'enemy-hero') {
@@ -483,7 +514,7 @@ const App: React.FC = () => {
                 }
 
                 // Counter-attack logic (Defender hits Attacker)
-                if (defender.attack > 0) {
+                if (defender.attack > 0 && !defender.isDead) {
                      if (myAttacker.hasShield) {
                          newPlayerBoard[attIdx].hasShield = false;
                          triggerDamage(myAttacker.id, 0);
@@ -496,19 +527,23 @@ const App: React.FC = () => {
                 
                 logs.push(`${myAttacker.name} attacked ${defender.name}.`);
 
-                // CLEAVE LOGIC (simplified - ignores shields on neighbors for now to keep code clean)
+                // CLEAVE LOGIC
                 if (myAttacker.mechanics?.includes('cleave')) {
                     if (defIdx > 0) {
                         const left = newEnemyBoard[defIdx - 1];
-                        newEnemyBoard[defIdx - 1] = { ...left, currentHealth: left.currentHealth - myAttacker.attack };
-                        triggerDamage(left.id, myAttacker.attack);
-                        logs.push(`Cleave hit ${left.name}!`);
+                        if (!left.isDead) {
+                          newEnemyBoard[defIdx - 1] = { ...left, currentHealth: left.currentHealth - myAttacker.attack };
+                          triggerDamage(left.id, myAttacker.attack);
+                          logs.push(`Cleave hit ${left.name}!`);
+                        }
                     }
                     if (defIdx < newEnemyBoard.length - 1) {
                         const right = newEnemyBoard[defIdx + 1];
-                        newEnemyBoard[defIdx + 1] = { ...right, currentHealth: right.currentHealth - myAttacker.attack };
-                        triggerDamage(right.id, myAttacker.attack);
-                        logs.push(`Cleave hit ${right.name}!`);
+                        if (!right.isDead) {
+                          newEnemyBoard[defIdx + 1] = { ...right, currentHealth: right.currentHealth - myAttacker.attack };
+                          triggerDamage(right.id, myAttacker.attack);
+                          logs.push(`Cleave hit ${right.name}!`);
+                        }
                     }
                 }
             }
@@ -521,15 +556,11 @@ const App: React.FC = () => {
             logs.push(`Lifesteal healed you for ${actualDamageDealt}!`);
         }
 
-        const cleanup = (b: Minion[]) => b.filter(m => {
-            if (m.currentHealth <= 0) { logs.push(`${m.name} died.`); return false; }
-            return true;
-        });
         
         return {
             ...prev,
-            player: { ...prev.player, board: cleanup(newPlayerBoard), health: newPlayerHealth },
-            enemy: { ...prev.enemy, board: cleanup(newEnemyBoard), health: newEnemyHealth },
+            player: { ...prev.player, board: newPlayerBoard.map(markDead), health: newPlayerHealth },
+            enemy: { ...prev.enemy, board: newEnemyBoard.map(markDead), health: newEnemyHealth },
             logs
         };
     });
@@ -548,7 +579,7 @@ const App: React.FC = () => {
     const opponent = gameState.turn === 'player' ? gameState.enemy : gameState.player;
     
     // A. Auto-Attack Logic
-    const autoAttackers = activePlayer.board.filter(m => m.mechanics?.includes('auto_attack'));
+    const autoAttackers = activePlayer.board.filter(m => m.mechanics?.includes('auto_attack') && !m.isDead);
     if (autoAttackers.length > 0) {
         for (const m of autoAttackers) {
              addLog(`${m.name} is going wild!`);
@@ -562,7 +593,7 @@ const App: React.FC = () => {
                  let opp = prev.turn === 'player' ? {...prev.enemy} : {...prev.player};
                  
                  const damage = m.mechanicValue || 1;
-                 const targets = [...opp.board.map(t => t.id), 'hero'];
+                 const targets = [...opp.board.filter(t => !t.isDead).map(t => t.id), 'hero'];
                  const targetId = targets[Math.floor(Math.random() * targets.length)];
 
                  if (targetId === 'hero') {
@@ -580,7 +611,7 @@ const App: React.FC = () => {
                          }
                      }
                  }
-                 opp.board = opp.board.filter(b => b.currentHealth > 0);
+                 opp.board = opp.board.map(markDead);
                  return {
                      ...prev,
                      player: prev.turn === 'player' ? active : opp,
@@ -596,7 +627,7 @@ const App: React.FC = () => {
     }
 
     // B. Spawning Logic
-    const spawners = activePlayer.board.filter(m => m.mechanics?.includes('summon_random'));
+    const spawners = activePlayer.board.filter(m => m.mechanics?.includes('summon_random') && !m.isDead);
     if (spawners.length > 0) {
        for (const m of spawners) {
            await new Promise(r => setTimeout(r, 200));
@@ -643,6 +674,7 @@ const App: React.FC = () => {
       
       const newMaxMana = Math.min(activePlayer.maxMana + 1, MAX_MANA_CAP);
       
+      // Reset attack state and clean justPlayed
       const updatedPlayerBoard = prev.player.board.map(m => ({ ...m, canAttack: true, justPlayed: false }));
       const updatedEnemyBoard = prev.enemy.board.map(m => ({ ...m, canAttack: true, justPlayed: false }));
       
@@ -728,18 +760,18 @@ const App: React.FC = () => {
                                 logs.push("Landlord gained mana.");
                             } else if (card.spellEffect === 'aoe_damage') {
                                 const dmg = card.spellValue || 1;
-                                // Simple AI state update for AOE (ignoring shield logic for brevity in AI loop, real calculation happens if implemented fully)
+                                // Simple AI state update for AOE
                                 prev.player.board.forEach(m => triggerDamage(m.id, dmg));
                                 prev.enemy.board.forEach(m => triggerDamage(m.id, dmg));
                                 
                                 return {
                                     ...prev,
-                                    player: { ...prev.player, board: prev.player.board.map(m => ({...m, currentHealth: m.currentHealth - dmg})).filter(m => m.currentHealth > 0)},
+                                    player: { ...prev.player, board: prev.player.board.map(m => ({...m, currentHealth: m.currentHealth - dmg})).map(markDead)},
                                     enemy: { 
                                         ...newEnemy, 
                                         mana: newEnemy.mana - card.cost, 
                                         hand: newEnemy.hand.filter(c => c.id !== card.id),
-                                        board: newEnemy.board.map(m => ({...m, currentHealth: m.currentHealth - dmg})).filter(m => m.currentHealth > 0)
+                                        board: newEnemy.board.map(m => ({...m, currentHealth: m.currentHealth - dmg})).map(markDead)
                                     },
                                     logs: [...logs, `Landlord cast Gas Leak!`]
                                 };
@@ -759,14 +791,14 @@ const App: React.FC = () => {
             while(attacking) {
                 const current = gameStateRef.current;
                 if (current.gameOver) return;
-                const attackers = current.enemy.board.filter(m => m.canAttack && !m.mechanics?.includes('cant_attack'));
+                const attackers = current.enemy.board.filter(m => m.canAttack && !m.mechanics?.includes('cant_attack') && !m.isDead);
                 if (attackers.length === 0) { attacking = false; break; }
 
                 const attacker = attackers[0];
-                const taunts = current.player.board.filter(m => m.taunt);
-                let targetType = taunts.length > 0 ? 'minion' : (current.player.board.length > 0 && Math.random() > 0.5 ? 'minion' : 'hero');
+                const taunts = current.player.board.filter(m => m.taunt && !m.isDead);
+                let targetType = taunts.length > 0 ? 'minion' : (current.player.board.filter(m => !m.isDead).length > 0 && Math.random() > 0.5 ? 'minion' : 'hero');
                 let targetId = targetType === 'minion' 
-                    ? (taunts.length > 0 ? taunts[0].id : current.player.board[Math.floor(Math.random() * current.player.board.length)].id)
+                    ? (taunts.length > 0 ? taunts[0].id : current.player.board.filter(m => !m.isDead)[Math.floor(Math.random() * current.player.board.filter(m => !m.isDead).length)].id)
                     : '';
 
                 playSound('attack');
@@ -805,7 +837,7 @@ const App: React.FC = () => {
                              }
 
                              // Player Counter Attack (Check AI Shield)
-                             if (def.attack > 0) {
+                             if (def.attack > 0 && !def.isDead) {
                                  if (myAttacker.hasShield) {
                                      newEnemyBoard[atIdx].hasShield = false;
                                      triggerDamage(myAttacker.id, 0);
@@ -817,19 +849,13 @@ const App: React.FC = () => {
 
                              logs.push(`${myAttacker.name} attacked ${def.name}.`);
                              
-                             // AI CLEAVE logic omitted for brevity but would function similarly
                         }
                     }
 
-                    const cleanup = (b: Minion[]) => b.filter(m => {
-                        if (m.currentHealth <= 0) { logs.push(`${m.name} died.`); return false; }
-                        return true;
-                    });
-
                     return {
                         ...prev,
-                        player: { ...prev.player, board: cleanup(newPlayerBoard), health: newPlayerHealth },
-                        enemy: { ...prev.enemy, board: cleanup(newEnemyBoard) },
+                        player: { ...prev.player, board: newPlayerBoard.map(markDead), health: newPlayerHealth },
+                        enemy: { ...prev.enemy, board: newEnemyBoard.map(markDead) },
                         logs
                     };
                 });
@@ -865,20 +891,50 @@ const App: React.FC = () => {
 
       {/* Game Over Screen */}
       {gameState.gameOver && (
-          <div className="absolute inset-0 z-50 bg-black/80 flex flex-col items-center justify-center text-white backdrop-blur-sm">
+          <div className="absolute inset-0 z-50 bg-black/80 flex flex-col items-center justify-center text-white backdrop-blur-sm overflow-hidden">
               <h1 className="text-6xl font-black text-center mb-4 text-red-600 uppercase tracking-widest animate-pulse" style={{textShadow: '0 0 10px white'}}>
                   {gameState.winner === 'player' ? 'VICTORY' : 'EVICTED'}
               </h1>
-              <div className="flex gap-4">
+
+              {/* Victory Visuals */}
+              {gameState.winner === 'player' ? (
+                  <>
+                    <div className="text-6xl animate-bounce mb-8">🎉🍺🎆</div>
+                    {/* Confetti Generation */}
+                    {Array.from({ length: 50 }).map((_, i) => (
+                        <div 
+                            key={i}
+                            className="confetti"
+                            style={{
+                                left: `${Math.random() * 100}vw`,
+                                top: `-${Math.random() * 20}vh`,
+                                backgroundColor: ['#ef4444', '#eab308', '#3b82f6', '#22c55e', '#a855f7'][Math.floor(Math.random() * 5)],
+                                animationDuration: `${2 + Math.random() * 3}s`,
+                                animationDelay: `${Math.random() * 2}s`
+                            }}
+                        />
+                    ))}
+                  </>
+              ) : (
+                  /* Loss Visuals */
+                  <div className="flex flex-col items-center">
+                      <div className="text-9xl towing-scene mt-4 transform">
+                          🚛🏠💨
+                      </div>
+                      <p className="text-stone-400 mt-8 italic text-xl animate-pulse">"There goes the neighborhood..."</p>
+                  </div>
+              )}
+
+              <div className="flex gap-4 mt-8 z-50">
                 <button 
                   onClick={resetGame}
-                  className="px-8 py-3 bg-yellow-500 text-black font-bold text-xl rounded hover:bg-yellow-400 border-4 border-white transform hover:scale-110 transition-transform"
+                  className="px-8 py-3 bg-yellow-500 text-black font-bold text-xl rounded hover:bg-yellow-400 border-4 border-white transform hover:scale-110 transition-transform shadow-lg"
                 >
                     PLAY AGAIN
                 </button>
                 <button 
                   onClick={() => setShowGallery(true)}
-                  className="px-8 py-3 bg-stone-600 text-white font-bold text-xl rounded hover:bg-stone-500 border-4 border-stone-400 transform hover:scale-110 transition-transform"
+                  className="px-8 py-3 bg-stone-600 text-white font-bold text-xl rounded hover:bg-stone-500 border-4 border-stone-400 transform hover:scale-110 transition-transform shadow-lg"
                 >
                     VIEW CARDS
                 </button>

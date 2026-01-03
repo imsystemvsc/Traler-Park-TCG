@@ -1,5 +1,17 @@
 import { Card } from './types';
 
+export const MECHANIC_DESCRIPTIONS: Record<string, string> = {
+  taunt: "Enemies must attack this unit first.",
+  charge: "Can attack immediately after being played.",
+  cleave: "Also deals damage to minions next to the target.",
+  divine_shield: "Ignores the first instance of damage.",
+  lifesteal: "Damage dealt restores Health to your Hero.",
+  auto_attack: "Attacks a random enemy automatically at end of turn.",
+  cant_attack: "Cannot be ordered to attack manually.",
+  summon_random: "Summons a random minion at end of turn.",
+  battlecry_damage: "Effect triggers immediately when played from hand.",
+};
+
 // Card Database
 export const CARD_DATABASE: Omit<Card, 'id'>[] = [
   // --- EXISTING MINIONS ---

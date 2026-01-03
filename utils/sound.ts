@@ -15,16 +15,14 @@ export const playSound = (type: SoundType) => {
     const ctx = getCtx();
     if (ctx.state === 'suspended') ctx.resume();
 
-    const osc = ctx.createOscillator();
-    const gainNode = ctx.createGain();
-    
-    osc.connect(gainNode);
-    gainNode.connect(ctx.destination);
-
     const now = ctx.currentTime;
 
     switch (type) {
-      case 'play':
+      case 'play': {
+        const osc = ctx.createOscillator();
+        const gainNode = ctx.createGain();
+        osc.connect(gainNode);
+        gainNode.connect(ctx.destination);
         // Card flip/slap sound
         osc.type = 'sine';
         osc.frequency.setValueAtTime(800, now);
@@ -34,8 +32,13 @@ export const playSound = (type: SoundType) => {
         osc.start(now);
         osc.stop(now + 0.1);
         break;
+      }
 
-      case 'attack':
+      case 'attack': {
+        const osc = ctx.createOscillator();
+        const gainNode = ctx.createGain();
+        osc.connect(gainNode);
+        gainNode.connect(ctx.destination);
         // Whoosh
         osc.type = 'triangle';
         osc.frequency.setValueAtTime(200, now);
@@ -45,8 +48,13 @@ export const playSound = (type: SoundType) => {
         osc.start(now);
         osc.stop(now + 0.2);
         break;
+      }
 
-      case 'damage':
+      case 'damage': {
+        const osc = ctx.createOscillator();
+        const gainNode = ctx.createGain();
+        osc.connect(gainNode);
+        gainNode.connect(ctx.destination);
         // Punch/Impact
         osc.type = 'sawtooth';
         osc.frequency.setValueAtTime(100, now);
@@ -56,8 +64,13 @@ export const playSound = (type: SoundType) => {
         osc.start(now);
         osc.stop(now + 0.15);
         break;
+      }
       
-      case 'heal':
+      case 'heal': {
+        const osc = ctx.createOscillator();
+        const gainNode = ctx.createGain();
+        osc.connect(gainNode);
+        gainNode.connect(ctx.destination);
         // Magical shimmer
         osc.type = 'sine';
         osc.frequency.setValueAtTime(400, now);
@@ -67,8 +80,13 @@ export const playSound = (type: SoundType) => {
         osc.start(now);
         osc.stop(now + 0.3);
         break;
+      }
 
-      case 'draw':
+      case 'draw': {
+        const osc = ctx.createOscillator();
+        const gainNode = ctx.createGain();
+        osc.connect(gainNode);
+        gainNode.connect(ctx.destination);
         // Paper slide
         osc.type = 'triangle';
         osc.frequency.setValueAtTime(600, now);
@@ -78,8 +96,13 @@ export const playSound = (type: SoundType) => {
         osc.start(now);
         osc.stop(now + 0.05);
         break;
+      }
 
-      case 'turn':
+      case 'turn': {
+        const osc = ctx.createOscillator();
+        const gainNode = ctx.createGain();
+        osc.connect(gainNode);
+        gainNode.connect(ctx.destination);
         // Ding
         osc.type = 'sine';
         osc.frequency.setValueAtTime(500, now);
@@ -88,21 +111,75 @@ export const playSound = (type: SoundType) => {
         osc.start(now);
         osc.stop(now + 0.5);
         break;
+      }
         
       case 'win':
-        // Major Arpeggio
-        [440, 554, 659, 880].forEach((freq, i) => {
+        // Victory Fanfare
+        [523.25, 659.25, 783.99, 1046.50, 783.99, 1046.50].forEach((freq, i) => {
             const o = ctx.createOscillator();
             const g = ctx.createGain();
             o.connect(g);
             g.connect(ctx.destination);
             o.type = 'square';
             o.frequency.value = freq;
-            g.gain.setValueAtTime(0.1, now + i*0.1);
-            g.gain.exponentialRampToValueAtTime(0.001, now + i*0.1 + 0.3);
-            o.start(now + i*0.1);
-            o.stop(now + i*0.1 + 0.3);
+            
+            const noteStart = now + i * 0.15;
+            const noteDur = i === 5 ? 0.8 : 0.12;
+
+            g.gain.setValueAtTime(0.1, noteStart);
+            g.gain.exponentialRampToValueAtTime(0.001, noteStart + noteDur);
+            o.start(noteStart);
+            o.stop(noteStart + noteDur);
         });
+        break;
+
+      case 'lose':
+        // Sad Trombone: Wah-wah-wah-waaaaah
+        // Frequencies approximately: C#4, B3, Bb3, A3
+        const notes = [277.18, 246.94, 233.08, 220.00];
+        const durations = [0.4, 0.4, 0.4, 1.2];
+        let startTime = now;
+        
+        notes.forEach((freq, i) => {
+            const o = ctx.createOscillator();
+            const g = ctx.createGain();
+            o.type = 'sawtooth'; // Sawtooth for brassy sound
+            o.connect(g);
+            g.connect(ctx.destination);
+            
+            o.frequency.setValueAtTime(freq, startTime);
+            
+            // Slide pitch down slightly during the note for the "wah" effect
+            if (i === notes.length - 1) {
+                 // Long slide on last note
+                 o.frequency.linearRampToValueAtTime(freq - 20, startTime + durations[i]);
+            } else {
+                 o.frequency.linearRampToValueAtTime(freq - 5, startTime + durations[i] * 0.8);
+            }
+
+            // Envelope
+            g.gain.setValueAtTime(0, startTime);
+            g.gain.linearRampToValueAtTime(0.2, startTime + 0.1); // Attack
+            g.gain.linearRampToValueAtTime(0, startTime + durations[i]); // Decay
+
+            o.start(startTime);
+            o.stop(startTime + durations[i]);
+            startTime += durations[i];
+        });
+        break;
+
+      case 'click':
+         // Tiny click
+        const oscClick = ctx.createOscillator();
+        const gainClick = ctx.createGain();
+        oscClick.connect(gainClick);
+        gainClick.connect(ctx.destination);
+        oscClick.frequency.setValueAtTime(800, now);
+        oscClick.frequency.exponentialRampToValueAtTime(100, now + 0.05);
+        gainClick.gain.setValueAtTime(0.05, now);
+        gainClick.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+        oscClick.start(now);
+        oscClick.stop(now + 0.05);
         break;
     }
   } catch (e) {
