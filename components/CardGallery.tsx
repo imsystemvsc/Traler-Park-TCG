@@ -16,6 +16,8 @@ export const CardGallery: React.FC<CardGalleryProps> = ({ onClose }) => {
 
   const minions = allCards.filter(c => c.cardType === 'minion');
   const spells = allCards.filter(c => c.cardType === 'spell');
+  const locations = allCards.filter(c => c.cardType === 'location');
+  const secrets = allCards.filter(c => c.cardType === 'secret');
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
@@ -51,8 +53,36 @@ export const CardGallery: React.FC<CardGalleryProps> = ({ onClose }) => {
             </div>
           </div>
 
+          {/* Locations Section */}
+          <div className="mb-12">
+            <h3 className="text-2xl text-blue-300 font-bold mb-6 border-b border-stone-600 pb-2 flex items-center gap-2">
+              <span>🏘️</span> Locations
+            </h3>
+            <div className="flex flex-wrap gap-8 justify-center">
+              {locations.map(card => (
+                <div key={card.id} className="transform hover:scale-110 transition-transform duration-200">
+                   <CardComponent card={card} playable={false} />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Secrets Section */}
+          <div className="mb-12">
+            <h3 className="text-2xl text-blue-500 font-bold mb-6 border-b border-stone-600 pb-2 flex items-center gap-2">
+              <span>🤐</span> Blue Tarp Specials (Secrets)
+            </h3>
+            <div className="flex flex-wrap gap-8 justify-center">
+              {secrets.map(card => (
+                <div key={card.id} className="transform hover:scale-110 transition-transform duration-200">
+                   <CardComponent card={card} playable={false} />
+                </div>
+              ))}
+            </div>
+          </div>
+
           {/* Spells Section */}
-          <div>
+          <div className="mb-12">
             <h3 className="text-2xl text-purple-300 font-bold mb-6 border-b border-stone-600 pb-2 flex items-center gap-2">
               <span>🔮</span> Spells
             </h3>

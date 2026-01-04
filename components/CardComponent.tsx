@@ -46,9 +46,9 @@ export const CardComponent: React.FC<CardProps> = ({ card, onClick, playable, is
         ${isSpell ? 'bg-[#f0e6d2] border-purple-900 rounded-t-3xl' : 'bg-[#e3dac9] border-stone-700'}
       `}
     >
-      {/* Tooltip */}
+      {/* Tooltip - Moved to Top Center to avoid overlap */}
       {showTooltip && mechanics.length > 0 && (
-        <div className="absolute -right-[150%] top-0 w-40 bg-stone-900/95 text-stone-100 text-[10px] p-2 rounded border border-stone-500 z-50 pointer-events-none shadow-xl backdrop-blur-sm text-left">
+        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-stone-900/95 text-stone-100 text-[10px] p-2 rounded border border-stone-500 z-50 pointer-events-none shadow-xl backdrop-blur-sm text-left">
            {mechanics.map(m => (
              <div key={m} className="mb-2 last:mb-0">
                <span className="font-bold text-yellow-500 uppercase block text-[9px] mb-0.5">{m.replace('_', ' ')}</span>

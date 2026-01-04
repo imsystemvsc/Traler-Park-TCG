@@ -8,7 +8,7 @@ const getCtx = () => {
   return audioCtx;
 };
 
-export type SoundType = 'play' | 'attack' | 'damage' | 'heal' | 'draw' | 'win' | 'lose' | 'click' | 'turn';
+export type SoundType = 'play' | 'attack' | 'damage' | 'damage_heavy' | 'heal' | 'draw' | 'win' | 'lose' | 'click' | 'turn';
 
 export const playSound = (type: SoundType) => {
   try {
@@ -63,6 +63,25 @@ export const playSound = (type: SoundType) => {
         gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
         osc.start(now);
         osc.stop(now + 0.15);
+        break;
+      }
+
+      case 'damage_heavy': {
+        // Big Impact (Lower pitch, longer decay)
+        const osc = ctx.createOscillator();
+        const gainNode = ctx.createGain();
+        osc.connect(gainNode);
+        gainNode.connect(ctx.destination);
+        
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(80, now);
+        osc.frequency.exponentialRampToValueAtTime(0.01, now + 0.4);
+        
+        gainNode.gain.setValueAtTime(0.8, now);
+        gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+        
+        osc.start(now);
+        osc.stop(now + 0.4);
         break;
       }
       

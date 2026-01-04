@@ -10,6 +10,54 @@ export const MECHANIC_DESCRIPTIONS: Record<string, string> = {
   cant_attack: "Cannot be ordered to attack manually.",
   summon_random: "Summons a random minion at end of turn.",
   battlecry_damage: "Effect triggers immediately when played from hand.",
+  battlecry_scavenge: "Add a random dead minion to your hand.",
+  start_turn_heal_all: "Heals your minions at start of turn.",
+  end_turn_damage_all: "Deals 1 damage to everything at end of turn.",
+  start_turn_draw: "Draw an extra card at start of turn.",
+  start_turn_buff_risk: "Give a random ally +2 Attack but deal 1 damage to it.",
+  start_turn_gain_mana: "Gain 1 extra Beer at start of turn.",
+  end_turn_summon_taunt: "Summons a 1/1 Ankle Biter with Taunt at end of turn.",
+  end_turn_heal_hero: "Restores 2 Health to your Hero at end of turn.",
+};
+
+// --- BANTER DICTIONARY ---
+export const BANTER_LINES = {
+    start: {
+        player: ["I ain't payin' rent!", "My trailer, my rules.", "You want a piece of me?"],
+        enemy: ["Eviction notice served.", "This place is a pigsty.", "I'm raising your rent."]
+    },
+    emote_hello: {
+        player: ["Howdy.", "Sup.", "Nice shoes."],
+        enemy: ["Rent is due.", "Unpleasant to see you.", "Tick tock."]
+    },
+    emote_threaten: {
+        player: ["I'll sic the dog on ya!", "Get off my property!", "I know karate!"],
+        enemy: ["I'm keeping your deposit.", "I have lawyers.", "This is a lease violation."]
+    },
+    hurt_small: {
+        player: ["Tis but a scratch.", "Ow.", "Hey!"],
+        enemy: ["Uncivilized brute!", "Stop that!", "My suit!"]
+    },
+    hurt_big: {
+        player: ["OOF! My back!", "Someone hold my beer...", "I need a doctor!"],
+        enemy: ["THIS IS A LAWSUIT!", "SECURITY!", "I'm calling the police!"]
+    },
+    play_secret: {
+        player: ["Heh heh heh...", "Don't mind this.", "Just a little insurance."],
+        enemy: ["Read the fine print...", "Clause 4, Section B...", "Hidden fees applied."]
+    },
+    trigger_secret: {
+        player: ["Gotcha!", "Surprise!", "You triggered my trap card!"],
+        enemy: ["Aha! A loophole!", "Lease violation detected!", "Caught you!"]
+    },
+    win: {
+        player: ["And stay out!", "Drinks on me!", "Trailer Park King!"],
+        enemy: ["I'll be baaaack...", "You'll hear from my lawyer.", "This isn't over."]
+    },
+    lose: {
+        player: ["Pack it up, boys...", "It was rigged!", "There goes the neighborhood."],
+        enemy: ["Get your stuff off the curb.", "Property value just went up.", "Finally, some peace."]
+    }
 };
 
 // Card Database
@@ -199,6 +247,152 @@ export const CARD_DATABASE: Omit<Card, 'id'>[] = [
     cardType: 'minion',
     mechanics: ['lifesteal']
   },
+  {
+    templateId: 'c37',
+    name: 'Dumpster Diver',
+    cost: 2,
+    attack: 2,
+    health: 1,
+    emoji: '🗑️🤿',
+    description: "Battlecry: Scavenge a dead minion.",
+    cardType: 'minion',
+    mechanics: ['battlecry_scavenge']
+  },
+
+  // --- LOCATIONS ---
+  {
+    templateId: 'l1',
+    name: 'Above-Ground Pool',
+    cost: 3,
+    attack: 0,
+    health: 4,
+    emoji: '🏊‍♂️',
+    description: 'Start of Turn: Heal all your minions for 1.',
+    cardType: 'location',
+    mechanics: ['start_turn_heal_all', 'cant_attack']
+  },
+  {
+    templateId: 'l2',
+    name: 'Burning Barrel',
+    cost: 2,
+    attack: 0,
+    health: 3,
+    emoji: '🛢️🔥',
+    description: 'End of Turn: Deal 1 damage to EVERYTHING.',
+    cardType: 'location',
+    mechanics: ['end_turn_damage_all', 'cant_attack']
+  },
+  {
+    templateId: 'l3',
+    name: 'Stolen Satellite',
+    cost: 3,
+    attack: 0,
+    health: 4,
+    emoji: '📡',
+    description: 'Start of Turn: Draw an extra card.',
+    cardType: 'location',
+    mechanics: ['start_turn_draw', 'cant_attack']
+  },
+  {
+    templateId: 'l4',
+    name: 'Meth Lab',
+    cost: 2,
+    attack: 0,
+    health: 3,
+    emoji: '🚐⚗️',
+    description: 'Start Turn: Give a random ally +2 ATK, deal 1 dmg to it.',
+    cardType: 'location',
+    mechanics: ['start_turn_buff_risk', 'cant_attack']
+  },
+  {
+    templateId: 'l5',
+    name: 'Junkyard Doghouse',
+    cost: 4,
+    attack: 0,
+    health: 5,
+    emoji: '🛖🐕',
+    description: 'End Turn: Summon a 1/1 Ankle Biter with Taunt.',
+    cardType: 'location',
+    mechanics: ['end_turn_summon_taunt', 'cant_attack']
+  },
+  {
+    templateId: 'l6',
+    name: 'Community Fridge',
+    cost: 2,
+    attack: 0,
+    health: 4,
+    emoji: '🧊🍔',
+    description: 'End Turn: Restore 2 Health to your Hero.',
+    cardType: 'location',
+    mechanics: ['end_turn_heal_hero', 'cant_attack']
+  },
+  {
+    templateId: 'l7',
+    name: 'Illegal Distillery',
+    cost: 3,
+    attack: 0,
+    health: 3,
+    emoji: '🥃🌽',
+    description: 'Start Turn: Gain 1 extra Beer.',
+    cardType: 'location',
+    mechanics: ['start_turn_gain_mana', 'cant_attack']
+  },
+
+  // --- SECRETS (Blue Tarp Specials) ---
+  {
+    templateId: 'sec1',
+    name: 'Trespassing!',
+    cost: 2,
+    emoji: '⛔',
+    description: 'Secret: When enemy attacks your Hero, destroy it.',
+    cardType: 'secret',
+    secretTrigger: 'on_attack_hero'
+  },
+  {
+    templateId: 'sec2',
+    name: 'Booby Trap',
+    cost: 2,
+    emoji: '💣',
+    description: 'Secret: When enemy attacks a minion, deal 2 damage to all enemies.',
+    cardType: 'secret',
+    secretTrigger: 'on_attack_minion'
+  },
+  {
+    templateId: 'sec3',
+    name: 'Noise Complaint',
+    cost: 3,
+    emoji: '🚔',
+    description: "Secret: When enemy plays their 3rd card, end their turn.",
+    cardType: 'secret',
+    secretTrigger: 'on_3rd_card'
+  },
+  {
+    templateId: 'sec4',
+    name: 'Bad Batch',
+    cost: 1,
+    emoji: '🧪',
+    description: 'Secret: When enemy casts a Spell, counter it.',
+    cardType: 'secret',
+    secretTrigger: 'on_spell_cast'
+  },
+  {
+    templateId: 'sec5',
+    name: 'Hidden Stash',
+    cost: 2,
+    emoji: '💊',
+    description: 'Secret: When you take lethal damage, stay at 1 HP and become Immune.',
+    cardType: 'secret',
+    secretTrigger: 'on_lethal_damage'
+  },
+  {
+    templateId: 'sec6',
+    name: 'Angry Opossum',
+    cost: 2,
+    emoji: '🐀',
+    description: 'Secret: When enemy plays a minion, summon a 4/2 Opossum with Charge.',
+    cardType: 'secret',
+    secretTrigger: 'on_minion_played'
+  },
 
   // --- SPELLS ---
   {
@@ -269,7 +463,7 @@ export const CARD_DATABASE: Omit<Card, 'id'>[] = [
   {
     templateId: 's7',
     name: 'Lottery Ticket',
-    cost: 1,
+    cost: 0,
     emoji: '🎫',
     description: 'Gain 2 Beer (Mana) this turn only.',
     cardType: 'spell',
