@@ -78,6 +78,10 @@ const App: React.FC = () => {
 
   const logsEndRef = useRef<HTMLDivElement>(null);
   const lastBanterTime = useRef<number>(0);
+  
+  // Ref for GameState to access latest state in async AI functions
+  const gameStateRef = useRef(gameState);
+  useEffect(() => { gameStateRef.current = gameState; }, [gameState]);
 
   useEffect(() => {
     logsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -149,8 +153,10 @@ const App: React.FC = () => {
   // --- Secret Logic ---
   const checkSecrets = async (trigger: SecretTrigger, data: any): Promise<boolean> => {
       // Returns TRUE if the action should be blocked/interrupted (e.g. Counterspell)
-      const opponentId = gameState.turn === 'player' ? 'enemy' : 'player';
-      const opponent = gameState[opponentId];
+      // USE REF to ensure latest state during async AI turns
+      const currentGs = gameStateRef.current;
+      const opponentId = currentGs.turn === 'player' ? 'enemy' : 'player';
+      const opponent = currentGs[opponentId];
       let interrupted = false;
 
       // Find relevant secrets
@@ -193,8 +199,6 @@ const App: React.FC = () => {
                            [prev.turn]: { ...active, board: newBoard }
                        }
                    });
-                   // Attack continues, but attacker might die first?
-                   // For simplicity, we assume attack happens simultaneously with trap, but we updated state above.
               }
               else if (secret.name === 'Bad Batch' && trigger === 'on_spell_cast') {
                   addLog("Spell was countered!");
@@ -202,15 +206,12 @@ const App: React.FC = () => {
               }
               else if (secret.name === 'Noise Complaint' && trigger === 'on_3rd_card') {
                   addLog("Turn ended due to noise complaint!");
-                  // Force end turn logic needs to happen in the main flow, we signal it via state or just handle endTurn call?
-                  // We'll signal interrupted here, but we need to actually end the turn.
-                  // Since we can't easily call endTurn from here without recursion issues, we'll assume the caller handles logic
-                  // Actually, we can schedule it.
                   setTimeout(() => endTurn(), 1000);
                   interrupted = true;
               }
               else if (secret.name === 'Angry Opossum' && trigger === 'on_minion_played') {
                   setGameState(prev => {
+                      // OpponentId is the SECRET OWNER. Add minion to THEIR board.
                       const opp = prev[opponentId];
                       if (opp.board.length < 7) {
                            const opossum: Minion = {
@@ -1309,8 +1310,7 @@ const App: React.FC = () => {
   };
 
   // --- AI ---
-  const gameStateRef = useRef(gameState);
-  useEffect(() => { gameStateRef.current = gameState; }, [gameState]);
+  // Note: checkSecrets now uses gameStateRef, so we don't need to pass state.
 
   useEffect(() => {
     if (gameState.turn === 'enemy' && !gameState.gameOver) {
@@ -1345,14 +1345,16 @@ const App: React.FC = () => {
                          }));
                          triggerBanter('play_secret', 'enemy');
                          await new Promise(r => setTimeout(r, 800));
+                         // Trigger 3rd card check
+                         await checkSecrets('on_3rd_card', {});
                          continue;
                     }
 
-                    setGameState(prev => {
-                        let newEnemy = { ...prev.enemy };
-                        const logs = [...prev.logs];
-                        
-                        if (card.cardType === 'minion' || card.cardType === 'location') {
+                    if (card.cardType === 'minion' || card.cardType === 'location') {
+                        setGameState(prev => {
+                            let newEnemy = { ...prev.enemy };
+                            const logs = [...prev.logs];
+                            
                             const newMinion = { 
                                 ...card as Minion, 
                                 currentHealth: card.health || 1, 
@@ -1364,39 +1366,87 @@ const App: React.FC = () => {
                                 isDead: false
                             };
                             newEnemy.board.push(newMinion);
+                            newEnemy.mana -= card.cost;
+                            newEnemy.hand = newEnemy.hand.filter(c => c.id !== card.id);
                             logs.push(`Landlord played ${card.name}.`);
-                        } else {
-                             if (card.spellEffect === 'draw') {
-                                const drawn = newEnemy.deck.splice(0, card.spellValue || 1);
-                                newEnemy.hand.push(...drawn);
-                                logs.push("Landlord cast Draw.");
-                                playSound('draw');
-                            } else if (card.spellEffect === 'gain_mana') {
-                                newEnemy.mana += (card.spellValue || 0);
-                                logs.push("Landlord gained mana.");
-                            } else if (card.spellEffect === 'aoe_damage') {
-                                const dmg = card.spellValue || 1;
-                                prev.player.board.forEach(m => triggerDamage(m.id, dmg));
-                                prev.enemy.board.forEach(m => triggerDamage(m.id, dmg));
-                                return {
-                                    ...prev,
-                                    player: { ...prev.player, board: prev.player.board.map(m => ({...m, currentHealth: m.currentHealth - dmg})).map(markDead)},
-                                    enemy: { 
-                                        ...newEnemy, 
-                                        mana: newEnemy.mana - card.cost, 
-                                        hand: newEnemy.hand.filter(c => c.id !== card.id),
-                                        board: newEnemy.board.map(m => ({...m, currentHealth: m.currentHealth - dmg})).map(markDead)
-                                    },
-                                    logs: [...logs, `Landlord cast Gas Leak!`],
-                                    cardsPlayedThisTurn: prev.cardsPlayedThisTurn + 1
-                                };
-                            }
-                        }
+
+                            return { 
+                                ...prev, 
+                                enemy: newEnemy, 
+                                logs, 
+                                cardsPlayedThisTurn: prev.cardsPlayedThisTurn + 1 
+                            };
+                        });
                         
-                        newEnemy.mana -= card.cost;
-                        newEnemy.hand = newEnemy.hand.filter(c => c.id !== card.id);
-                        return { ...prev, enemy: newEnemy, logs, cardsPlayedThisTurn: prev.cardsPlayedThisTurn + 1 };
-                    });
+                        // Trigger Opossum Check
+                        await checkSecrets('on_minion_played', { card });
+
+                    } else {
+                        // Spells
+                        // Check Counterspell FIRST
+                        const interrupted = await checkSecrets('on_spell_cast', { card });
+                        
+                        if (interrupted) {
+                             setGameState(prev => ({
+                                 ...prev,
+                                 enemy: {
+                                     ...prev.enemy,
+                                     mana: prev.enemy.mana - card.cost,
+                                     hand: prev.enemy.hand.filter(c => c.id !== card.id)
+                                 },
+                                 cardsPlayedThisTurn: prev.cardsPlayedThisTurn + 1
+                             }));
+                        } else {
+                            // Apply spell
+                            setGameState(prev => {
+                                let newEnemy = { ...prev.enemy };
+                                const logs = [...prev.logs];
+
+                                if (card.spellEffect === 'draw') {
+                                    const drawn = newEnemy.deck.splice(0, card.spellValue || 1);
+                                    newEnemy.hand.push(...drawn);
+                                    logs.push("Landlord cast Draw.");
+                                    playSound('draw');
+                                } else if (card.spellEffect === 'gain_mana') {
+                                    newEnemy.mana += (card.spellValue || 0);
+                                    logs.push("Landlord gained mana.");
+                                } else if (card.spellEffect === 'aoe_damage') {
+                                    const dmg = card.spellValue || 1;
+                                    prev.player.board.forEach(m => triggerDamage(m.id, dmg));
+                                    prev.enemy.board.forEach(m => triggerDamage(m.id, dmg));
+                                    
+                                    // Handle state update outside? No, complex state merge here
+                                    // We need to return the new state object completely here
+                                    // This part is tricky because triggerDamage is side effect
+                                    // But setGameState logic above for AOE was complex, let's replicate properly
+                                    const pBoard = prev.player.board.map(m => ({...m, currentHealth: m.currentHealth - dmg})).map(markDead);
+                                    const eBoard = newEnemy.board.map(m => ({...m, currentHealth: m.currentHealth - dmg})).map(markDead);
+
+                                    return {
+                                        ...prev,
+                                        player: { ...prev.player, board: pBoard },
+                                        enemy: { 
+                                            ...newEnemy, 
+                                            mana: newEnemy.mana - card.cost, 
+                                            hand: newEnemy.hand.filter(c => c.id !== card.id),
+                                            board: eBoard
+                                        },
+                                        logs: [...logs, `Landlord cast Gas Leak!`],
+                                        cardsPlayedThisTurn: prev.cardsPlayedThisTurn + 1
+                                    };
+                                }
+                                
+                                // Fallback for simple spells (draw, mana) that didn't return early
+                                newEnemy.mana -= card.cost;
+                                newEnemy.hand = newEnemy.hand.filter(c => c.id !== card.id);
+                                return { ...prev, enemy: newEnemy, logs, cardsPlayedThisTurn: prev.cardsPlayedThisTurn + 1 };
+                            });
+                        }
+                    }
+                    
+                    // Check Noise Complaint
+                    await checkSecrets('on_3rd_card', {});
+                    
                     await new Promise(r => setTimeout(r, 800));
                 }
             }
@@ -1528,7 +1578,7 @@ const App: React.FC = () => {
 
   // --- UI Render ---
   return (
-    <div className={`w-full h-screen flex flex-col items-center p-2 relative bg-stone-900/5 overflow-hidden ${shake ? 'shake-screen' : ''} ${gameState.player.mana >= 10 ? 'drunk-effect' : ''}`}>
+    <div className={`w-full h-screen flex flex-col items-center p-2 relative bg-stone-900/5 overflow-hidden ${shake ? 'shake-screen' : ''}`}>
       
       {/* Top Bar for Tools */}
       <div className="absolute top-2 left-2 z-40">

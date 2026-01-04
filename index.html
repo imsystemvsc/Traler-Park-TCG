@@ -77,8 +77,8 @@
 
       /* Location Card Style */
       .location-card {
-        clip-path: polygon(10% 0, 90% 0, 100% 10%, 100% 100%, 0 100%, 0 10%);
-        border-top: 4px solid #60a5fa; 
+        border-top: 6px solid #60a5fa;
+        border-radius: 8px 8px 4px 4px;
       }
 
       /* Game Over Effects */
@@ -129,18 +129,6 @@
         20%, 80% { transform: translate3d(4px, 0, 0); }
         30%, 50%, 70% { transform: translate3d(-8px, 0, 0); }
         40%, 60% { transform: translate3d(8px, 0, 0); }
-      }
-
-      /* Drunk Effect */
-      .drunk-effect {
-        animation: drunkWobble 4s ease-in-out infinite;
-        filter: blur(0.5px) contrast(1.1);
-      }
-      
-      @keyframes drunkWobble {
-        0% { filter: blur(0px) hue-rotate(0deg); }
-        50% { filter: blur(1px) hue-rotate(5deg); }
-        100% { filter: blur(0px) hue-rotate(0deg); }
       }
 
       .drunk-bubbles::after {
